@@ -1,0 +1,203 @@
+
+<!DOCTYPE html>
+<html lang="gu">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NAVKAR - Find a Worker</title><script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f4f7fb;
+      color: #172033;
+    }
+    header {
+      background: #123b70;
+      color: white;
+      padding: 22px 16px;
+      text-align: center;
+    }
+    header h1 { margin: 0 0 8px; }
+    main { max-width: 650px; margin: auto; padding: 20px 14px; }
+    .search, .worker {
+      background: white;
+      padding: 16px;
+      margin-bottom: 14px;
+      border-radius: 12px;
+      box-shadow: 0 2px 10px #0000000c;
+    }
+    input, select, button {
+      width: 100%;
+      padding: 12px;
+      margin-top: 10px;
+      border-radius: 8px;
+      font-size: 16px;
+    }
+    input, select { border: 1px solid #ccd4e0; background: white; }
+    button {
+      border: 0;
+      background: #176b45;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .tag { color: #176b45; font-weight: bold; }
+    .muted { color: #687386; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>NAVKAR</h1>
+    <div>તમારા વિસ્તારના કામદાર શોધો</div>
+  </header>
+
+  <main>
+    <div class="search">
+      <h2>કામદાર શોધો</h2>
+      <input id="search" placeholder="કામદારનું નામ શોધો">
+      <select id="category">
+        <option value="">બધા કામના પ્રકાર</option>
+        <option>Electrician</option>
+        <option>Plumber</option>
+        <option>Carpenter</option>
+        <option>Painter</option>
+        <option>Mason</option>
+      </select>
+      <button onclick="filterWorkers()">Search</button>
+    </div>
+
+    <div id="workers">
+      
+<div class="worker" data-name="demo worker" data-category="electrician">
+  <h3>Demo Worker</h3>
+  <p>કામ: Electrician (ઇલેક્ટ્રિશિયન)</p>
+  <p>અનુભવ: 2 Years (Demo)</p>
+  <p>વિસ્તાર: Bhachau</p>
+  <p class="tag">Approved Worker</p>
+  <p class="muted">મોબાઇલ નંબર જોવા માટે ₹30 પેમેન્ટ જરૂરી છે.</p>
+  <button onclick="payWorker()">Unlock Phone Number - ₹30</button>
+  <p class="muted" id="message"></p>
+</div>
+
+    </div>
+  </main>
+
+  <script>
+    function filterWorkers() {
+      const search = document.getElementById("search").value.toLowerCase();
+      const category = document.getElementById("category").value.toLowerCase();
+
+      document.querySelectorAll(".worker").forEach(worker => {
+        const nameMatch = worker.dataset.name.includes(search);
+        const categoryMatch = !category || worker.dataset.category === category;
+        worker.style.display = nameMatch && categoryMatch ? "block" : "none";
+      });
+    }
+
+    
+
+const NAVKAR_API =
+  "https://script.google.com/macros/s/AKfycbxPBoQcHVtDNfb0Tam0fF4XXLJLnaOCDlT9OBK57OdQnEqzfSMvYRUSxD6VI9aQiL21/exec";
+
+async function payWorker() {
+  const message = document.getElementById("message");
+  const button = document.querySelector(
+    '.worker button[onclick="payWorker()"]'
+  );
+
+  message.textContent = "પેમેન્ટ માટે તૈયારી થઈ રહી છે...";
+
+  try {
+    const response = await fetch(NAVKAR_API, {
+      method: "POST",
+      headers: {
+        "Content-Type": "text/plain;charset=utf-8"
+      },
+      body: JSON.stringify({
+        action: "createOrder",
+        workerName: "Demo Worker"
+      })
+    });
+
+    const order = await response.json();
+
+    if (!order.success) {
+      throw new Error(order.message || "Order બની શક્યો નથી.");
+    }
+
+    const options = {
+      key: order.keyId,
+      amount: order.amount,
+      currency: order.currency,
+      name: "NAVKAR",
+      description: "Worker phone number unlock",
+      order_id: order.orderId,
+
+      handler: async function (payment) {
+        message.textContent = "પેમેન્ટ ચકાસાઈ રહ્યું છે...";
+
+        try {
+          const verifyResponse = await fetch(NAVKAR_API, {
+            method: "POST",
+            headers: {
+              "Content-Type": "text/plain;charset=utf-8"
+            },
+            body: JSON.stringify({
+              action: "verifyCheckoutPayment",
+              workerName: "Demo Worker",
+              orderId: payment.razorpay_order_id,
+              paymentId: payment.razorpay_payment_id,
+              signature: payment.razorpay_signature
+            })
+          });
+
+          const result = await verifyResponse.json();
+
+          if (!result.success) {
+            throw new Error(
+              result.message || "પેમેન્ટ વેરિફાય થયું નથી."
+            );
+          }
+
+          message.textContent =
+            "Dipendra નો મોબાઇલ નંબર: " + result.phone;
+
+        } catch (error) {
+          message.textContent =
+            "ચકાસણી પૂર્ણ થઈ નથી. સપોર્ટનો સંપર્ક કરો.";
+        }
+      },
+
+      modal: {
+        ondismiss: function () {
+          message.textContent = "પેમેન્ટ રદ થયું છે.";
+        }
+      },
+
+      theme: {
+        color: "#176b45"
+      }
+    };
+
+    const checkout = new Razorpay(options);
+
+    checkout.on("payment.failed", function () {
+      message.textContent =
+        "પેમેન્ટ નિષ્ફળ ગયું. ફરી પ્રયત્ન કરો.";
+    });
+
+    checkout.open();
+
+  } catch (error) {
+    console.error(error);
+    message.textContent =
+      "પેમેન્ટ શરૂ થઈ શક્યું નથી. સર્વર કનેક્શન તપાસો.";
+  }
+}
+
+
+  </script>
+</body>
+</html>
